@@ -1,0 +1,9 @@
+pandas
+numpy
+torch
+ipdb
+matplotlib
+scipy
+wandb
+dotenv
+pytorch-lightning

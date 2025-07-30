@@ -1,0 +1,8 @@
+/data
+/checkpoints
+/wandb
+.env
+*.out
+/venv
+__pycache__/
+*.py[codz]
