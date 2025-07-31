@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from jaxtyping import Float
 from typing import Tuple
+import ipdb
 
 T = torch.Tensor
 
@@ -43,7 +44,7 @@ class FLDEncoder(nn.Module):
         self.embedding_dim = embedding_dim
         self.sequence_length = sequence_length
 
-    def forward(self, s: Float[torch.Tensor, "batch context observable_dim"]) -> Tuple[
+    def forward(self, s: Float[torch.Tensor, "batch observable_dim observable_dim"]) -> Tuple[
         Float[torch.Tensor, "batch embedding_dim"],
         Float[torch.Tensor, "batch embedding_dim"],
         Float[torch.Tensor, "batch embedding_dim"],
@@ -63,7 +64,6 @@ class FLDEncoder(nn.Module):
             frequency (torch.Tensor): Dominant frequency of the signal (batch_size, embedding_dim)
             offset (torch.Tensor): DC offset of the signal (batch_size, embedding_dim)
         """
-
         # B = batch size
         # N = sequence length
         # d = state dimension
@@ -80,18 +80,18 @@ class FLDEncoder(nn.Module):
         rfft = torch.fft.rfft(z_traj, dim=1)
 
         # Exclude the DC component
-        amplitude_spectrum = rfft.abs()[:, :, 1:]
+        amplitude_spectrum = rfft.abs()[:, 1:, :]
         power = amplitude_spectrum**2
 
         freq_bins = torch.fft.rfftfreq(z_traj.size(1))[1:]
 
         # Obtain the signal frequency by summing the contributions of each frequency bin
         # weighted by its power
-        frequency = torch.sum(freq_bins * power, dim=1) / torch.sum(power, dim=1)
+        frequency = torch.sum(freq_bins.reshape(1,-1,1) * power, dim=1) / torch.sum(power, dim=1)
 
         amplitude = 2 * torch.sqrt(torch.sum(power, dim=1)) / z_traj.size(1)
 
-        offset = rfft.real[:, :, 0] / z_traj.size(1)
+        offset = rfft.real[:, 0, :] / z_traj.size(1)
 
         # (batch, latent_dim, 2)
         intermediate_angles = torch.zeros((z_traj.size(0), self.embedding_dim, 2), device=z_traj.device)
@@ -186,13 +186,13 @@ class FLDDecoder(nn.Module):
         )
 
         # Decode the trajectory into the original space
-        x = self.decoder(z)
+        x = self.decoder(z.transpose(1, 2)).transpose(1, 2)  # (batch_size, observable_dim, forecast_length)
 
         return x
 
 
 class FLD(nn.Module):
-    def __init__(self, observable_dim, hidden_dim, embedding_dim, segment_length):
+    def __init__(self, observable_dim, hidden_dim, embedding_dim, segment_length, forecast):
         super(FLD, self).__init__()
         self.encoder = FLDEncoder(
             observable_dim, hidden_dim, embedding_dim, segment_length
@@ -201,8 +201,15 @@ class FLD(nn.Module):
         self.decoder = FLDDecoder(
             observable_dim, hidden_dim, embedding_dim, segment_length
         )
+        self.forecast = forecast
 
-    def forward(self, x: T, k: int):
+    def forward(self, x: Float[T, "batch observable_dim segment_length"])-> Float[T, "batch forecast observable_dim segment_length"]:
         a, phase, f, b = self.encoder(x)
-        phase = self.dynamics(f, phase, k)
-        return self.decoder(f, a, b, phase)
+        output = torch.zeros(
+            (x.size(0), self.forecast, x.size(1), x.size(2)), device=x.device
+        )
+        for i in range(self.forecast):
+            phase = self.dynamics(f, phase, 1)
+            output[:, i, :, :] = self.decoder(f, a, b, phase)
+        return output
+

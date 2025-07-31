@@ -179,6 +179,20 @@ class RMMLoss(nn.Module):
 
     def forward(self, pred, target):
         return torch.mean((pred - target) ** 2 * self.weights.view(1, -1, 1))
+    
+class FLDLoss(nn.Module):
+    def __init__(self, forecast=8, alpha=0.9):
+        super(FLDLoss, self).__init__()
+        self.forecast = forecast
+        self.alpha = alpha
+        self.register_buffer(
+            "weights", torch.tensor([alpha**k for k in range(forecast)])
+        )
+
+    def forward(self, pred, target):
+        # Pred and target have dimension (batch_size, forecast_length, segment_length, observable_dim)
+        return torch.mean((pred - target) ** 2 * self.weights.view(1, -1, 1, 1))
+        
 
 
 class CombinedLoss(nn.Module):
@@ -305,17 +319,22 @@ def get_model(args):
             observable_dim=args.observable_dim,
             hidden_dim=args.hidden_dim,
             embedding_dim=args.embedding_dim,
-            sequence_length=args.context,
+            segment_length=args.context,
+            forecast=args.forecast,
         )
     # if args.loss == "rwm":
     #     criterion = RMMLoss(forecast=args.forecast)
     # elif args.loss == "rmm_energy":
-    criterion = CombinedLoss(
-        forecast=args.forecast,
-        rwm_factor=args.rwm_factor,
-        energy_factor=args.energy_factor,
-        length_factor=args.length_factor,
-    )
+
+    if args.model == "fld":
+        criterion = FLDLoss(forecast=args.forecast)
+    else:
+        criterion = CombinedLoss(
+            forecast=args.forecast,
+            rwm_factor=args.rwm_factor,
+            energy_factor=args.energy_factor,
+            length_factor=args.length_factor,
+        )
     return model, criterion
 
 
@@ -331,19 +350,31 @@ def main(args: argparse.Namespace) -> None:
     
     model, criterion = get_model(args)
     # Initialize components
-    train_dataset = RWMDataset(
-        args.train_path,
-        context=args.context,
-        forecast=args.forecast,
-        flatten=not (hasattr(model, "encoder") and isinstance(model.encoder, CNNEncoder)),
-    )
-    val_dataset = RWMDataset(
-        args.val_path,
-        split="val",
-        context=args.context,
-        forecast=args.forecast,
-        flatten=not (hasattr(model, "encoder") and isinstance(model.encoder, CNNEncoder)),
-    )
+    if args.model == "fld":
+        train_dataset = FLDDataset(
+            args.train_path,
+            context=args.context,
+            forecast=args.forecast,
+        )
+        val_dataset = FLDDataset(
+            args.val_path,
+            context=args.context,
+            forecast=args.forecast,
+        )
+    else:
+        train_dataset = RWMDataset(
+            args.train_path,
+            context=args.context,
+            forecast=args.forecast,
+            flatten=not (hasattr(model, "encoder") and (isinstance(model.encoder, CNNEncoder) or isinstance(model.encoder, FLDEncoder))),
+        )
+        val_dataset = RWMDataset(
+            args.val_path,
+            split="val",
+            context=args.context,
+            forecast=args.forecast,
+            flatten=not (hasattr(model, "encoder") and (isinstance(model.encoder, CNNEncoder) or isinstance(model.encoder, FLDEncoder))),
+        )
 
     test_data = TrajectoryDataset(data_path=args.visualisation_data_path, split="test")
     test_loader = DataLoader(test_data, batch_size=1)

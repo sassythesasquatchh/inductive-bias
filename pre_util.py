@@ -6,7 +6,7 @@ import torch
 from pathlib import Path
 from torch import nn
 from typing import Optional, Dict, Any
-from datasets import PointDataset, SegmentDataset, TrajectoryDataset
+from datasets import PointDataset, FLDDataset, TrajectoryDataset
 from torch.utils.data import Dataset
 from constants import *
 import ipdb
@@ -99,9 +99,9 @@ def get_datasets(args: argparse.Namespace) -> tuple[Dataset, Dataset]:
         train_dataset = PointDataset(data_path=data_path, split="train")
         val_dataset = PointDataset(data_path=data_path, split="val")
         test_dataset = TrajectoryDataset(data_path=test_data_path, split="test")
-    elif args.dataset == "segment":
-        train_dataset = SegmentDataset(split="train")
-        val_dataset = SegmentDataset(split="val")
+    # elif args.dataset == "segment":
+    #     train_dataset = SegmentDataset(split="train")
+    #     val_dataset = SegmentDataset(split="val")
     else:
         raise ValueError(f"Dataset {args.dataset} not supported.")
 
@@ -258,7 +258,7 @@ def process_trajectory(model, x, args, device):
         ic = x[0].unsqueeze(0)
         reconstructed_trajectory[0] = ic
         upper_bound = x.size(0) - 1
-    elif hasattr(model.model, "encoder") and isinstance(model.model.encoder, CNNEncoder):
+    elif hasattr(model.model, "encoder") and (isinstance(model.model.encoder, CNNEncoder) or isinstance(model.model.encoder, FLDEncoder)):
         x_t = x[: args.context, :].T.unsqueeze(0)
         x_t1 = torch.zeros_like(x_t)
         reconstructed_trajectory[: args.context, :] = x[: args.context, :]
@@ -283,7 +283,7 @@ def process_trajectory(model, x, args, device):
                 reconstructed_trajectory[j].unsqueeze(0)
             )
 
-        elif hasattr(model.model, "encoder") and isinstance(model.model.encoder, CNNEncoder):
+        elif hasattr(model.model, "encoder") and (isinstance(model.model.encoder, CNNEncoder) or isinstance(model.model.encoder, FLDEncoder)):
             # Get the first prediction
             obs_next = model.model(x_t)[:, 0, :].squeeze()
             reconstructed_trajectory[j + args.context] = obs_next

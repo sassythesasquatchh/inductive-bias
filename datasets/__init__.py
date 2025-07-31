@@ -1,3 +1,3 @@
 from .point import *
-from .segment import SegmentDataset
+from .segment import *
 from .trajectory import TrajectoryDataset

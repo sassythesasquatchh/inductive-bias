@@ -3,20 +3,37 @@ from torch import nn
 from torch.utils.data import Dataset
 from pathlib import Path
 import pickle
+import random
 
 
-class SegmentDataset(Dataset):
-    def __init__(self, data_path, split="train"):
+class FLDDataset(Dataset):
+
+    def __init__(
+        self, data_path: Path,  context=51, forecast=8
+    ):
         self.data = pickle.load(open(data_path, "rb"))
-        if split == "train":
-            self.data = self.data[: int(0.8 * len(self.data))]
-        else:
-            self.data = self.data[int(0.8 * len(self.data)) :]
+        self.context = context
+        self.forecast = forecast
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        X = torch.tensor(self.data[idx]["segment"], dtype=torch.float32)
-        y = torch.tensor(self.data[idx]["label"], dtype=torch.float32)
-        return X, y
+        idx = idx % (len(self.data))
+        start_idx = random.randint(
+            a=0,
+            b=self.data[0]["observed"].shape[1] - self.context - self.forecast,
+        )
+        X_t = torch.tensor(
+            self.data[idx]["observed"][:, start_idx : start_idx + self.context].T,
+            dtype=torch.float32,
+        )
+        X_tk = torch.zeros(self.forecast, *X_t.shape, dtype=torch.float32)
+
+        for i in range(self.forecast):
+           
+            X_tk[i,...] = torch.tensor(
+                self.data[idx]["observed"][:, start_idx+i : start_idx + self.context+i].T, dtype=torch.float32
+            )
+       
+        return X_t, X_tk
