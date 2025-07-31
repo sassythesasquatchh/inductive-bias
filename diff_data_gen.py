@@ -100,33 +100,33 @@ def get_ranges(option: str, num_trajectories: int, only_small: bool = False):
 
     if not only_small:
         if option == "normal_training":
-            range_1 = jnp.linspace(0.5, 3, int(num_trajectories * 2.5 / 9.5))
-            range_2 = jnp.linspace(4, 8, int(num_trajectories * 4 / 9.5))
-            range_3 = jnp.linspace(9, 12, int(num_trajectories * 3 / 9.5))
-            theta_dot0_vals = jnp.concatenate((range_1, range_2, range_3))
+            range_1 = np.linspace(0.5, 3, int(num_trajectories * 2.5 / 9.5))
+            range_2 = np.linspace(4, 8, int(num_trajectories * 4 / 9.5))
+            range_3 = np.linspace(9, 12, int(num_trajectories * 3 / 9.5))
+            theta_dot0_vals = np.concatenate((range_1, range_2, range_3))
         elif option == "validation":
-            range_1 = jnp.linspace(3, 3.4, num_trajectories // 4)
-            range_2 = jnp.linspace(3.6, 4, num_trajectories // 4)
-            range_3 = jnp.linspace(8, 8.4, num_trajectories // 4)
-            range_4 = jnp.linspace(8.6, 9, num_trajectories // 4)
-            theta_dot0_vals = jnp.concatenate((range_1, range_2, range_3, range_4))
+            range_1 = np.linspace(3, 3.4, num_trajectories // 4)
+            range_2 = np.linspace(3.6, 4, num_trajectories // 4)
+            range_3 = np.linspace(8, 8.4, num_trajectories // 4)
+            range_4 = np.linspace(8.6, 9, num_trajectories // 4)
+            theta_dot0_vals = np.concatenate((range_1, range_2, range_3, range_4))
         elif option == "testing":
-            theta_dot0_vals = jnp.array([3.5, 8.5])
+            theta_dot0_vals = np.array([3.5, 8.5])
         elif option == "sparse_training":
-            range_1 = jnp.linspace(0.5, 1, int(num_trajectories * 2.5 / 9.5))
-            range_2 = jnp.linspace(6, 7, int(num_trajectories * 4 / 9.5))
-            range_3 = jnp.linspace(11.5, 12, int(num_trajectories * 3 / 9.5))
-            theta_dot0_vals = jnp.concatenate((range_1, range_2, range_3))
+            range_1 = np.linspace(0.5, 1, int(num_trajectories * 2.5 / 9.5))
+            range_2 = np.linspace(6, 7, int(num_trajectories * 4 / 9.5))
+            range_3 = np.linspace(11.5, 12, int(num_trajectories * 3 / 9.5))
+            theta_dot0_vals = np.concatenate((range_1, range_2, range_3))
 
     else:
         if option == "normal_training":
-            theta_dot0_vals = jnp.linspace(0.5, 3, num_trajectories)
+            theta_dot0_vals = np.linspace(0.5, 3, num_trajectories)
         elif option == "validation":
-            theta_dot0_vals = jnp.linspace(3, 4, num_trajectories)
+            theta_dot0_vals = np.linspace(3, 4, num_trajectories)
         elif option == "testing":
-            theta_dot0_vals = jnp.array([3.5])
+            theta_dot0_vals = np.array([3.5])
         elif option == "sparse_training":
-            theta_dot0_vals = jnp.linspace(0.5, 1, num_trajectories)
+            theta_dot0_vals = np.linspace(0.5, 1, num_trajectories)
     
     return theta_dot0_vals
 
@@ -183,6 +183,9 @@ def generate_trajectories(args, t_eval=np.linspace(0, TIMESPAN, NUM_SAMPLES)):
         filename += f"_{args.num_trajectories}"
         if args.noise > 0:
             filename += f"_{args.noise}"
+
+    if args.only_small:
+        filename += "_closed_traj"
     file_path = f"data/{filename}.pkl"
     with open(file_path, "wb") as f:
         pickle.dump(trajectories, f)

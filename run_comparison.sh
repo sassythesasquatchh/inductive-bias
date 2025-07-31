@@ -38,6 +38,6 @@ models=(
 for training_file in "${training_files[@]}"; do
     for model in "${models[@]}"; do
         echo "Training with $training_file, model=$model"
-        python3 train_rwm.py --model $model --context 32 --forecast 32 --hidden_dim 64 --epochs 300 --batch_size 32 --embedding_dim 3 --train_path "data/$training_file.pkl"
+        python3 train_rwm.py --model $model --context 33 --forecast 33 --hidden_dim 64 --epochs 300 --batch_size 32 --embedding_dim 3 --train_path "data/$training_file.pkl"
     done
 done

@@ -7,3 +7,4 @@ scipy
 wandb
 dotenv
 pytorch-lightning
+jaxtyping

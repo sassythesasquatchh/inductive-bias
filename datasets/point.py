@@ -113,19 +113,21 @@ class RWMDataset(Dataset):
 
 
 if __name__ == "__main__":
-    data_path = Path("data/pendulum_trajectories_train.pkl")
-    dataset = PointDatasetPrebatched(
-        data_path, split="train", batch_size=32, max_forward_pred=1
-    )
-    print(len(dataset))
-    print(dataset[0][0].shape)
-    print(dataset[0][2])
+    # data_path = Path("data/pendulum_trajectories_train.pkl")
+    # dataset = PointDatasetPrebatched(
+    #     data_path, split="train", batch_size=32, max_forward_pred=1
+    # )
+    # print(len(dataset))
+    # print(dataset[0][0].shape)
+    # print(dataset[0][2])
 
-    dataset = RWMDataset(data_path, split="train", context=32, forecast=8)
-    print(len(dataset))
-    print(dataset[0][0].shape)
-    print(dataset[0][1].shape)
+    # dataset = RWMDataset(data_path, split="train", context=32, forecast=8)
+    # print(len(dataset))
+    # print(dataset[0][0].shape)
+    # print(dataset[0][1].shape)
 
+
+    data_path = Path("data/validation_closed_traj.pkl")
     dataset = RWMDataset(
         data_path, split="train", context=33, forecast=9, flatten=False
     )

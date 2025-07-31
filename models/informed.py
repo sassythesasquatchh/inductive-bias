@@ -3,6 +3,7 @@ import torch
 from constants import *
 from jaxtyping import Float
 import ipdb
+from math import floor
 
 from .blocks import PointEncoder, PointDecoder
 
@@ -75,12 +76,15 @@ class CNNEncoder(nn.Module):
             "kernel_size": context,  # Kernel is the whole trajectory segment
             "stride": 1,
             "padding": int(
-                (context - 1) / 2
+                (context / 2)
             ),  # Padding to ensure the output length is the same as input length
             "groups": 1,
             "bias": True,
             "padding_mode": "zeros",
         }
+
+        assert floor(((context + 2*self.conv_args["padding"] - (self.conv_args["kernel_size"]-1)-1)/self.conv_args["stride"])+1)==context, \
+            f"Context {context} does not match the expected output length after convolution. Please adjust the context or padding."
         # NOTE in chenhao's implementation, the final batch norm and elu are included
         self.encoder = nn.Sequential(
             nn.Conv1d(
@@ -102,7 +106,7 @@ class CNNEncoder(nn.Module):
         self.angle_encoder = nn.Linear(context, 2)
         self.angular_velocity_encoder = nn.Linear(context, 1)
 
-    def forward(self, x: Float[torch.Tensor, "batch context observable_dim"])->Float[torch.Tensor, "batch 3"]:
+    def forward(self, x: Float[torch.Tensor, "batch observable_dim context"])->Float[torch.Tensor, "batch 3"]:
         # Input x is of shape (batch_size, observable_dim, context)
         # z is of shape (batch_size, latent_channels, context)
         z = self.encoder(x)
@@ -149,7 +153,7 @@ class CNNDecoder(nn.Module):
             ),
         )
 
-    def forward(self, x):
+    def forward(self, x:Float[torch.Tensor, "batch latent_channels forecast"])->Float[torch.Tensor, "batch observable_dim forecast"]:
         # Input x is of shape (batch_size, 3, forecast)
         z = self.decoder(x)
         # Output z is of shape (batch_size, observable_dim, forecast)
@@ -173,7 +177,7 @@ class InformedDecoder(nn.Module):
         X = x[:, :,1:2] * self.sampling_positions
         Y = x[:,:, 0:1] * -self.sampling_positions
         vel = x[:,:, 2:] * self.sampling_positions
-        ret = torch.cat([X, Y, vel], dim=1)
+        ret = torch.cat([X, Y, vel], dim=-1)
         return ret
 
 
@@ -201,7 +205,7 @@ class FullyInformed(nn.Module):
     def forward(self, x: torch.Tensor):
         z = self.encoder(x)
         z = self.dynamics(z)
-        return self.decoder(z)
+        return self.decoder(z.unsqueeze(0)).squeeze()  # Add a dimension for forecast length
 
 
 class InformedEnd2End(nn.Module):
@@ -308,7 +312,7 @@ class InformedCNN(nn.Module):
         for i in range(self.forecast):
             z = self.dynamics(z)
             z_forecast[:, i, :] = z
-        return self.decoder(z_forecast)
+        return self.decoder(z_forecast.transpose(1, 2)).transpose(1, 2)
 
 class PartiallyInformed(nn.Module):
     """

@@ -254,10 +254,15 @@ def process_trajectory(model, x, args, device):
     reconstructed_trajectory = torch.zeros_like(x)
     latent_trajectory = torch.zeros(x.size(0), args.embedding_dim).to(device)
     latent_reconstructed_trajectory = torch.zeros_like(latent_trajectory)
-    if not args.training == "rwm":
+    if isinstance(model, FullyInformed):
         ic = x[0].unsqueeze(0)
         reconstructed_trajectory[0] = ic
         upper_bound = x.size(0) - 1
+    elif hasattr(model.model, "encoder") and isinstance(model.model.encoder, CNNEncoder):
+        x_t = x[: args.context, :].T.unsqueeze(0)
+        x_t1 = torch.zeros_like(x_t)
+        reconstructed_trajectory[: args.context, :] = x[: args.context, :]
+        upper_bound = x.size(0) - args.context
     else:
         x_t = x[: args.context, :].reshape(1, -1)
         x_t1 = torch.zeros_like(x_t)
@@ -273,10 +278,28 @@ def process_trajectory(model, x, args, device):
         # except Exception as e:
         #     pass
     for j in range(0, upper_bound):
-        if not args.training == "rwm":
+        if isinstance(model, FullyInformed):
             reconstructed_trajectory[j + 1] = model.model(
                 reconstructed_trajectory[j].unsqueeze(0)
             )
+
+        elif hasattr(model.model, "encoder") and isinstance(model.model.encoder, CNNEncoder):
+            # Get the first prediction
+            obs_next = model.model(x_t)[:, 0, :].squeeze()
+            reconstructed_trajectory[j + args.context] = obs_next
+            x_t1[:,:,:-1] = x_t[:,:,1:]
+            # Add the new prediction to the end
+            x_t1[:,:,-1] = obs_next
+            x_t = x_t1.clone()
+            try:
+                latent_reconstructed_trajectory[j + args.context] = model.model.encoder(
+                    x_t
+                ).squeeze()
+                latent_trajectory[j + args.context] = model.model.encoder(
+                    x[j : j + args.context, :].T.unsqueeze(0)
+                ).squeeze()
+            except Exception as e:
+                pass
         else:
             # Get the first prediction
             # ipdb.set_trace()

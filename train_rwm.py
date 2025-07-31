@@ -232,7 +232,7 @@ def get_model(args):
             forecast=args.forecast,
         )
     elif args.model == "baseline":
-        model = RWM(
+        model = RWMUnstructuredBaseline(
             observable_dim=args.observable_dim,
             hidden_dim=args.hidden_dim,
             context=args.context,
@@ -287,6 +287,14 @@ def get_model(args):
             hidden_dim=args.hidden_dim,
             context=args.context,
             forecast=args.forecast,
+        )
+
+    elif args.model == "fld":
+        model = FLD(
+            observable_dim=args.observable_dim,
+            hidden_dim=args.hidden_dim,
+            embedding_dim=args.embedding_dim,
+            sequence_length=args.context,
         )
     # if args.loss == "rwm":
     #     criterion = RMMLoss(forecast=args.forecast)
@@ -416,7 +424,7 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     args = parse_args()
     args.run_name = f"{args.model}_{args.embedding_dim}_{args.forecast}_{args.context}_{args.hidden_dim}"
-    args.training = "rwm"
+    args.training = "rwm" if args.model not in ["fully-informed"] else "normal"
     try:
         main(args)
     except Exception as e:
