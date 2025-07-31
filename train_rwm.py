@@ -289,6 +289,17 @@ def get_model(args):
             forecast=args.forecast,
         )
 
+    elif args.model == "partially-informed":
+        model = PartiallyInformed(
+            dt=args.dt,
+            g=args.g,
+            l=args.l,
+            observable_dim=args.observable_dim,
+            hidden_dim=args.hidden_dim,
+            context=args.context,
+            forecast=args.forecast,
+        )
+
     elif args.model == "fld":
         model = FLD(
             observable_dim=args.observable_dim,
@@ -317,21 +328,22 @@ def main(args: argparse.Namespace) -> None:
     pl.seed_everything(args.seed)
     torch.autograd.set_detect_anomaly(True)
 
+    
+    model, criterion = get_model(args)
     # Initialize components
     train_dataset = RWMDataset(
         args.train_path,
         context=args.context,
         forecast=args.forecast,
-        flatten="cnn" not in args.model,
+        flatten=not (hasattr(model, "encoder") and isinstance(model.encoder, CNNEncoder)),
     )
     val_dataset = RWMDataset(
         args.val_path,
         split="val",
         context=args.context,
         forecast=args.forecast,
-        flatten="cnn" not in args.model,
+        flatten=not (hasattr(model, "encoder") and isinstance(model.encoder, CNNEncoder)),
     )
-    model, criterion = get_model(args)
 
     test_data = TrajectoryDataset(data_path=args.visualisation_data_path, split="test")
     test_loader = DataLoader(test_data, batch_size=1)
