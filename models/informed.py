@@ -99,10 +99,11 @@ class CNNEncoder(nn.Module):
                 latent_channels,
                 **self.conv_args,
             ),
-            # nn.BatchNorm1d(num_features=latent_dim),
-            # nn.ELU(),
+            nn.BatchNorm1d(num_features=latent_channels),
+            nn.ELU(),
         )
 
+        # TODO add activation
         self.angle_encoder = nn.Linear(context, 2)
         self.angular_velocity_encoder = nn.Linear(context, 1)
 

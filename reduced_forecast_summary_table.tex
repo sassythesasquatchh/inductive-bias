@@ -1,0 +1,12 @@
+\begin{tabular}{lrrrrrrrrrrrr}
+\toprule
+Model & out_of_distribution_length Mean & out_of_distribution_length Std. Dev. & in_distribution_length Mean & in_distribution_length Std. Dev. & out_of_distribution_energy Mean & out_of_distribution_energy Std. Dev. & in_distribution_energy Mean & in_distribution_energy Std. Dev. & in_distribution_error Mean & in_distribution_error Std. Dev. & test_out_of_distribution_error Mean & test_out_of_distribution_error Std. Dev. \\
+\midrule
+MLP (Baseline) & 2.88 & 0.10 & 2.79 & 0.10 & 3.99 & 0.72 & 3.29 & 0.97 & 135.21 & 88.82 & 76.55 & 48.92 \\
+Control & 2.80 & 0.00 & 2.80 & 0.00 & 6.12 & 0.08 & 1.13 & 0.02 & 1.36 & 0.93 & 1.73 & 1.14 \\
+Hybrid Dynamics & 2.69 & 0.07 & 2.67 & 0.02 & 0.70 & 1.22 & 0.11 & 0.23 & 76.78 & 33.52 & 100.23 & 47.51 \\
+Informed Dynamics & 2.59 & 0.12 & 2.57 & 0.03 & 0.89 & 0.93 & 0.46 & 0.17 & 87.71 & 54.61 & 99.33 & 50.73 \\
+MLP (Informed decoder) & 2.84 & 0.17 & 2.84 & 0.06 & 3.35 & 1.72 & 0.25 & 0.29 & 60.18 & 32.56 & 40.51 & 20.21 \\
+MLP (Latent Space) & 2.77 & 0.05 & 2.77 & 0.05 & 3.29 & 0.61 & 2.71 & 0.64 & 55.29 & 33.87 & 30.02 & 12.02 \\
+\bottomrule
+\end{tabular}
