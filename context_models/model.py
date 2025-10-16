@@ -125,8 +125,8 @@ class ContextModel(BaseModel):
 
         for i in range(0, trajectory_length - context_length):
             # Latent rollout
-            obs_context = x[:, i : i + context_length, :].clone()
-            latent_gt[:, i + context_length, :] = self.extract_latent(obs_context)[
+            obs_gt_context = x[:, i + 1 : i + context_length + 1, :].clone()
+            latent_gt[:, i + context_length, :] = self.extract_latent(obs_gt_context)[
                 :, -1, :
             ]
             latent_rollout_context = latent_rollout[

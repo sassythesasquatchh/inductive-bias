@@ -172,17 +172,17 @@ class CanonicalDecoder(eqx.Module):
     def __call__(
         self, latent: Float[jax.Array, "batch sequence_length 2"]
     ) -> Float[jax.Array, "batch sequence_length 3"]:
-        n = latent.shape[-1] // 2
-        theta = latent[..., :n]
-        theta_dot = latent[..., n:]
-        x = self.sampling_positions * jnp.sin(theta)
-        y = -self.sampling_positions * jnp.cos(theta)
+        theta = latent[..., 0]
+        theta_dot = latent[..., 1]
+        theta_from_x_axis = theta - jnp.pi / 2
+        x = self.sampling_positions * jnp.cos(theta_from_x_axis)
+        y = self.sampling_positions * jnp.sin(theta_from_x_axis)
         linear_velocity = self.sampling_positions * theta_dot
         return jnp.concatenate([x, y, linear_velocity], axis=-1)
 
 
 class CanonicalEncoder(eqx.Module):
-    sampling_positions_excluding_zero: jnp.ndarray
+    sampling_positions: jnp.ndarray
 
     def __init__(self, config: Config = Config()):
         self.sampling_positions = jnp.array(config.SAMPLING_POSITIONS) * config.L
@@ -195,7 +195,7 @@ class CanonicalEncoder(eqx.Module):
         y = observables[..., n : 2 * n]
         linear_velocity = observables[..., 2 * n :]
 
-        theta = jnp.mean(jnp.arctan2(x, -y))
-        # theta_dot = jnp.mean(linear_velocity / self.sampling_positions_excluding_zero)
+        # Angle from lower equilibrium
+        theta = jnp.mean(jnp.arctan2(y, x)) + jnp.pi / 2
         theta_dot = jnp.mean(linear_velocity / self.sampling_positions)
         return jnp.stack([theta, theta_dot], axis=-1)

@@ -126,7 +126,6 @@ def train(
         devices="auto",
         deterministic=True,
         fast_dev_run=debug,
-        overfit_batches=10 if debug else 0,
     )
 
     # Create data loaders

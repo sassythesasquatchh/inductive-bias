@@ -3,7 +3,7 @@ import pickle
 
 import numpy as np
 
-from util.config import *
+from util.config import Config
 
 config = Config()
 

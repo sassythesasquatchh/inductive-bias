@@ -49,8 +49,8 @@ class InformedDecoder(BaseDecoder):
         self.sampling_positions = self.sampling_positions.to(z.device)
         # To align with the coordinate system in the observable space,
         # where the angle is defined relative to the stable equilibrium
-        X = z[:, :, 1:2] * self.sampling_positions
-        Y = z[:, :, 0:1] * -self.sampling_positions
+        X = z[:, :, 0:1] * self.sampling_positions
+        Y = z[:, :, 1:2] * self.sampling_positions
         vel = z[:, :, 2:] * self.sampling_positions
         ret = torch.cat([X, Y, vel], dim=-1)
         return ret

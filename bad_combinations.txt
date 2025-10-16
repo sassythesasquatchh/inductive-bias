@@ -1,0 +1,2 @@
+('UnstructuredEncoder', 'UnstructuredDynamics', 'InformedDecoder')
+('InformedEncoder', 'InformedDynamics', 'UnstructuredDecoder')

@@ -1,8 +1,10 @@
 import pytest
+import torch
 
 from common.classes import RolloutOutput
 from util.config import Config
 from util.dataset import TorchTrajectoryDataset
+from util.pre_util import calculate_energy, get_length
 from util.rollout import evaluate_rollout
 from util.test_continuity import test_continuity
 from util.visualisation import animate_trajectories
@@ -45,6 +47,18 @@ def test_animate(vis_rollout: RolloutOutput):
     animate_trajectories(vis_rollout, Config(), traj_names, "test")
 
 
+def test_metrics(vis_rollout):
+    rollout = vis_rollout[0]["obs_gt"]
+    config = vis_rollout[1].config
+    length = get_length(rollout, config)
+    energy = calculate_energy(rollout, config)
+
+    assert torch.isclose(length, torch.Tensor([config.L]), atol=1e-3).all()
+    assert torch.isclose(
+        energy, torch.mean(energy, dim=-1).unsqueeze(1), atol=5e-1
+    ).all()
+
+
 if __name__ == "__main__":
     import ipdb
 
@@ -53,6 +67,7 @@ if __name__ == "__main__":
         test_rollout_eval(rollout)
         test_continuity_metric()
         test_animate(rollout)
+        test_metrics(rollout)
     except Exception as e:
         print(e)
         ipdb.post_mortem()

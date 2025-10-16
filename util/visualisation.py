@@ -202,21 +202,22 @@ def animate_trajectory(
     # Save animation with fallback options
     try:
         # First try MP4 with ffmpeg
-        filename += ".mp4"
-        ani.save(filename, writer="ffmpeg", fps=int(1 / config.DT))
-        print(f"Animation saved as {filename}")
+        fname = filename + ".mp4"
+        ani.save(fname, writer="ffmpeg", fps=int(1 / config.DT))
+        print(f"Animation saved as {fname}")
     except Exception as e:
         print(f"MP4/ffmpeg not available: {e}")
         try:
             # Fallback to GIF with Pillow
-            filename += ".gif"
-            ani.save(filename, writer="pillow", fps=int(1 / config.DT))
-            print(f"Animation saved as {filename} (GIF format)")
+            fname = filename + ".gif"
+            # Note: Framerate for gifs is not reliable
+            ani.save(fname, writer="pillow", fps=int(1 / config.DT))
+            print(f"Animation saved as {fname} (GIF format)")
         except Exception as e:
             print(f"Failed to save animation: {e}")
 
     plt.close(fig)
-    return filename
+    return fname
 
 
 def animate_trajectories(
@@ -301,6 +302,12 @@ def animate_trajectories(
         )
 
         try:
-            wandb.log({video_name: wandb.Video(filename, caption=video_name)})
+            wandb.log(
+                {
+                    video_name: wandb.Video(
+                        filename, caption=video_name, format=filename.split(".")[-1]
+                    )
+                }
+            )
         except Exception as e:
             print(f"Failed to log video to wandb: {e}")

@@ -66,7 +66,7 @@ class UnstructuredEncoder(BaseEncoder):
             f"Input sequence length {x.size(1)} does not match model context length {self.context}"
         )
 
-        return self.net(x.view(x.size(0), -1)).view(x.size(0), x.size(1), -1)
+        return self.net(x.reshape(x.size(0), -1)).reshape(x.size(0), x.size(1), -1)
 
     def get_latent_dim(self) -> int:
         return self.latent_dim

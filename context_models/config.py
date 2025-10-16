@@ -1,19 +1,19 @@
-from context_models import encoders, dynamics, decoders
+from context_models import decoders, dynamics, encoders
 
 encoder_dict = {
-    "informed": encoders.InformedEncoder,
     "unstructured": encoders.UnstructuredEncoder,
+    "informed": encoders.InformedEncoder,
     "cnn": encoders.CNNEncoder,
 }
 
 dynamics_dict = {
     "informed": dynamics.InformedDynamics,
-    "hybrid": dynamics.HybridDynamics,
     "unstructured": dynamics.UnstructuredDynamics,
+    "hybrid": dynamics.HybridDynamics,
 }
 
 decoder_dict = {
-    "informed": decoders.InformedDecoder,
     "unstructured": decoders.UnstructuredDecoder,
+    "informed": decoders.InformedDecoder,
     "cnn": decoders.CNNDecoder,
 }

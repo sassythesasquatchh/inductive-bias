@@ -1,3 +1,5 @@
+import itertools
+
 from hnn.train import train
 from util.dataset import JaxTrajectoryDataset
 from util.jax import to_torch
@@ -10,20 +12,25 @@ from .util import (
 
 
 def test_hnn():
-    model = train(
-        training_data_path=DEFAULT_TRAIN_PATH,
-        validation_data_path=DEFAULT_VAL_PATH,
-        num_epochs=1,
-        batch_size=2,
-        sequence_length=10,
-    )
+    for use_canonical_encoder, use_canonical_decoder in itertools.product(
+        [False, True], [False, True]
+    ):
+        model = train(
+            training_data_path=DEFAULT_TRAIN_PATH,
+            validation_data_path=DEFAULT_VAL_PATH,
+            num_epochs=1,
+            batch_size=2,
+            sequence_length=10,
+            use_canonical_encoder=use_canonical_encoder,
+            use_canonical_decoder=use_canonical_decoder,
+        )
 
-    visualisation_dataset = JaxTrajectoryDataset(
-        data_path=DEFAULT_VISUALISATION_PATH, type="observed"
-    )
+        visualisation_dataset = JaxTrajectoryDataset(
+            data_path=DEFAULT_VISUALISATION_PATH, type="observed"
+        )
 
-    rollout = model.rollout(visualisation_dataset.data)
-    rollout = {k: to_torch(v) for k, v in rollout.items()}
+        rollout = model.rollout(visualisation_dataset.data)
+        rollout = {k: to_torch(v) for k, v in rollout.items()}
 
 
 if __name__ == "__main__":

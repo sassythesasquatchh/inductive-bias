@@ -56,11 +56,16 @@ class InformedDynamics(BaseDynamics):
         x = z[:, -1, 0:1]
         y = z[:, -1, 1:2]
         theta_dot = z[:, -1, 2:3]
-        theta = torch.atan2(y, x) + torch.pi / 2
-        theta, theta_dot = self.solver(theta, theta_dot)
-        x = torch.cos(theta)
-        y = torch.sin(theta)
-        return torch.stack([x, y, theta_dot], dim=-1)
+        # theta = torch.atan2(y, x) + torch.pi / 2
+        theta_from_x_axis = torch.atan2(y, x)
+        theta_from_equilibrium = theta_from_x_axis + torch.pi / 2
+        next_theta_from_equilibrium, next_theta_dot = self.solver(
+            theta_from_equilibrium, theta_dot
+        )
+        next_theta_from_x_axis = next_theta_from_equilibrium - torch.pi / 2
+        x = torch.cos(next_theta_from_x_axis)
+        y = torch.sin(next_theta_from_x_axis)
+        return torch.stack([x, y, next_theta_dot], dim=-1)
 
 
 class HybridDynamics(BaseDynamics):
@@ -77,11 +82,15 @@ class HybridDynamics(BaseDynamics):
         x = latent_state[:, 0:1]
         y = latent_state[:, 1:2]
         theta_dot = latent_state[:, 2:3]
-        theta = torch.atan2(y, x)
-        theta, theta_dot = self.solver(theta, theta_dot)
-        x = torch.cos(theta)
-        y = torch.sin(theta)
-        latent_state = torch.stack([x, y, theta_dot], dim=-1) + self.correction(
+        theta_from_x_axis = torch.atan2(y, x)
+        theta_from_equilibrium = theta_from_x_axis + torch.pi / 2
+        next_theta_from_equilibrium, next_theta_dot = self.solver(
+            theta_from_equilibrium, theta_dot
+        )
+        next_theta_from_x_axis = next_theta_from_equilibrium - torch.pi / 2
+        x = torch.cos(next_theta_from_x_axis)
+        y = torch.sin(next_theta_from_x_axis)
+        latent_state = torch.stack([x, y, next_theta_dot], dim=-1) + self.correction(
             latent_state
         )
         return latent_state

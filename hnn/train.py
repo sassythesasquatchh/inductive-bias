@@ -50,6 +50,8 @@ def train(
     num_epochs: int = 10000,
     batch_size: int = 64,
     sequence_length: int = 20,
+    use_canonical_encoder: bool = False,
+    use_canonical_decoder: bool = False,
     lr: float = 1e-3,
 ):
     print("Loading dataset...")
@@ -73,8 +75,8 @@ def train(
         training_dataset.get_input_dim(),
         training_dataset.get_latent_dim(),
         config=training_dataset.config,
-        use_canonical_decoder=True,
-        use_canonical_encoder=False,
+        use_canonical_decoder=use_canonical_decoder,
+        use_canonical_encoder=use_canonical_encoder,
     )
 
     optimizer = optax.chain(optax.clip(1.0), optax.adam(lr))
