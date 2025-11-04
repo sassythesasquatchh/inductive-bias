@@ -1,0 +1,42 @@
+# Configure Experiments
+# Bash file expects the structure:
+# encoder dynamics decoder context latent_dim
+# eg. informed unstructured cnn 33 3
+
+# Unstructured
+unstructured unstructured unstructured 33 2
+
+# Unstructured
+unstructured unstructured unstructured 33 3
+
+# Unstructured
+unstructured unstructured unstructured 33 4
+
+# Unstructured
+unstructured unstructured unstructured 33 5
+
+# Unstructured
+unstructured unstructured unstructured 33 6
+
+# Unstructured
+unstructured unstructured unstructured 33 7
+
+# Unstructured
+unstructured unstructured unstructured 33 8
+
+# Unstructured
+unstructured unstructured unstructured 33 9
+
+# Unstructured
+unstructured unstructured unstructured 33 10
+
+# Unstructured
+unstructured unstructured unstructured 33 11
+
+# Unstructured
+unstructured unstructured unstructured 33 12
+
+
+
+
+

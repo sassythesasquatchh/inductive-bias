@@ -36,16 +36,13 @@ class ContextDataset(Dataset):
             dtype=torch.float32,
         )
 
-        # X_tk = torch.tensor(
-        #     self.data[idx]["observed"][
-        #         start_idx + self.context : start_idx + self.context + self.forecast, :
-        #     ],
-        #     dtype=torch.float32,
-        # )
-
         X_tk = torch.tensor(
             self.data[idx]["observed"][
-                start_idx : start_idx + self.context + self.forecast, :
+                start_idx + self.context - 1 : start_idx
+                + self.context
+                + self.forecast
+                - 1,
+                :,
             ],
             dtype=torch.float32,
         )

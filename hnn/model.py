@@ -158,7 +158,7 @@ class PendulumHNN(eqx.Module):
             latent_rollout=latent_rollout,
             latent_end_to_end=latent_end_to_end,
             obs_gt=x,
-            obs_rollout=rollout_obs,
+            obs_latent_rollout=rollout_obs,
             obs_end_to_end=obs_end_to_end,
         )
 

@@ -9,7 +9,9 @@ from util.config import Config
 
 
 class ContextDataset(Dataset):
-    def __init__(self, data_path: Path, context=33, forecast=8, noise_level=0.01):
+    config: Config
+
+    def __init__(self, data_path: Path, context=51, forecast=8, noise_level=0.01):
         data = pickle.load(open(data_path, "rb"))
         self.data = data["trajectories"]
         self.config = Config(**data["simulation_config"])
@@ -35,20 +37,15 @@ class ContextDataset(Dataset):
             self.data[idx]["observed"][start_idx : start_idx + self.context, :],
             dtype=torch.float32,
         )
+        X_tk = torch.zeros(self.forecast, *X_t.shape, dtype=torch.float32)
 
-        # X_tk = torch.tensor(
-        #     self.data[idx]["observed"][
-        #         start_idx + self.context : start_idx + self.context + self.forecast, :
-        #     ],
-        #     dtype=torch.float32,
-        # )
-
-        X_tk = torch.tensor(
-            self.data[idx]["observed"][
-                start_idx : start_idx + self.context + self.forecast, :
-            ],
-            dtype=torch.float32,
-        )
+        for i in range(0, self.forecast):
+            X_tk[i, ...] = torch.tensor(
+                self.data[idx]["observed"][
+                    start_idx + i + 1 : start_idx + self.context + i + 1, :
+                ],
+                dtype=torch.float32,
+            )
 
         if self.noise_level > 0:
             noise = torch.randn_like(X_t) * self.noise_level * self.std_dev

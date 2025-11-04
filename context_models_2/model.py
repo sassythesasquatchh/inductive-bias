@@ -19,50 +19,26 @@ class ContextModel(BaseModel):
         self.dynamics = dynamics
         self.decoder = decoder
         self.forecast = forecast
+        self.context = encoder.get_context_length()
 
     def forward(
         self, x: Float[torch.Tensor, "batch context observable_dim"]
-    ) -> Float[torch.Tensor, "batch forecast observable_dim"]:
+    ) -> Float[torch.Tensor, "batch forecast context observable_dim"]:
         B, N, D = x.size()
-        # trajectory_length = output_length or N
-        trajectory_length = N + self.forecast
-        context_length = self.encoder.get_context_length()
 
         reconstructed_obs_end_to_end = torch.zeros(
-            B, trajectory_length, D, device=x.device, dtype=x.dtype
+            B, self.forecast, self.context, D, device=x.device, dtype=x.dtype
         )
 
-        latent_end_to_end = torch.zeros(
-            B,
-            trajectory_length,
-            self.encoder.get_latent_dim(),
-            device=x.device,
-            dtype=x.dtype,
-        )
+        last_obs_context = x
+        latent_context = self.extract_latent(last_obs_context).clone()
+        for i in range(0, self.forecast):
+            latent_context_from_obs = self.extract_latent(last_obs_context).clone()
+            latent_context = latent_context_from_obs
+            latent_context = self.dynamics(latent_context)
+            last_obs_context = self.decoder(latent_context)
+            reconstructed_obs_end_to_end[:, i, :, :] = last_obs_context
 
-        # Initialise result buffers
-        initial_obs_context = x[:, :context_length, :].clone()
-        reconstructed_obs_end_to_end[:, :context_length, :] = initial_obs_context
-        latent_end_to_end[:, :context_length, :] = self.extract_latent(
-            initial_obs_context
-        ).clone()
-
-        for i in range(0, trajectory_length - context_length):
-            end_to_end_obs_context = reconstructed_obs_end_to_end[
-                :, i : i + context_length, :
-            ].clone()
-            context_latent = self.extract_latent(end_to_end_obs_context).clone()
-            next_latent = self.dynamics(context_latent)[:, -1, :]
-            latent_end_to_end[:, i + context_length, :] = next_latent
-
-            # Transform back to observable space
-            latent_end_to_end_context = latent_end_to_end[
-                :, i + 1 : i + context_length + 1
-            ].clone()
-            next_reconstructed = self.decoder(latent_end_to_end_context)[:, -1, :]
-            reconstructed_obs_end_to_end[:, i + context_length, :] = next_reconstructed
-
-        # return reconstructed_obs_end_to_end[:, x.size(1) :, :]
         return reconstructed_obs_end_to_end
 
     def extract_latent(

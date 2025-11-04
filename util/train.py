@@ -1,17 +1,15 @@
-import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint
-from torch import nn
-import torch
-from pathlib import Path
-import wandb
-from pytorch_lightning.loggers import Logger, WandbLogger
-from typing import Any, Callable, Dict, Optional, Union
-
-
 import argparse
 import os
-
 from pathlib import Path
+from typing import Any, Callable, Dict, Optional, Union
+
+import pytorch_lightning as pl
+import torch
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import Logger, WandbLogger
+from torch import nn
+
+import wandb
 
 
 def create_run_name(args: argparse.Namespace) -> str:
@@ -20,10 +18,12 @@ def create_run_name(args: argparse.Namespace) -> str:
         run_name = args.run_name
     except AttributeError:
         pass
-    try:
-        run_name = f"{args.encoder}_{args.dynamics}_{args.decoder}"
-    except AttributeError:
-        pass
+
+    if not run_name:
+        try:
+            run_name = f"{args.encoder}_{args.dynamics}_{args.decoder}"
+        except AttributeError:
+            pass
     if not run_name:
         run_name = "default"
     args.run_name = run_name

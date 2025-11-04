@@ -7,75 +7,97 @@ import pytorch_lightning as pl
 import torch
 from dotenv import load_dotenv
 from pytorch_lightning.loggers import Logger, WandbLogger
-from torch import nn
 from torch.utils.data import DataLoader
 
 import wandb
+from context_models_2.decoders import BaseDecoder
+from context_models_2.dynamics import BaseDynamics
+from context_models_2.encoders import BaseEncoder
+from context_models_2.model import ContextModel
+from context_models_2.util import RWMLoss
 from util.dataset import TorchTrajectoryDataset
 from util.pre_util import parse_args
 from util.rollout import evaluate_rollout
 from util.test_continuity import test_continuity
-from util.train import LitModel, get_callbacks, get_logger, load_args_from_checkpoint
-from util.visualisation import animate_trajectories, visualise_latent_space
+from util.train import (
+    LitModel,
+    create_run_name,
+    get_callbacks,
+    get_logger,
+    load_args_from_checkpoint,
+)
+from util.visualisation import animate_trajectories
 
-from .data import FLDDataset
-from .model import FLD
+from .config import decoder_dict, dynamics_dict, encoder_dict
+from .data import ContextDataset
 
 # Load environment variables first
 load_dotenv()
 
 
-class FLDLoss(nn.Module):
-    def __init__(self, forecast=8, alpha=0.9):
-        super(FLDLoss, self).__init__()
-        self.forecast = forecast
-        self.alpha = alpha
-        self.register_buffer(
-            "weights", torch.tensor([alpha**k for k in range(forecast)])
-        )
-
-    def forward(self, pred, target):
-        # Pred and target have dimension (batch_size, forecast_length, segment_length, observable_dim)
-        return torch.mean((pred - target) ** 2 * self.weights.view(1, -1, 1, 1))
-
-
 def train(
     train_path: str,
     val_path: str,
+    encoder_class: BaseEncoder,
+    dynamics_class: BaseDynamics,
+    decoder_class: BaseDecoder,
     hidden_dim: int = 64,
     embedding_dim: int = 2,
-    context: int = 51,
+    context: int = 33,
     forecast: int = 8,
-    alpha: float = 0.9,
     weight_decay: float = 1e-4,
     learning_rate: float = 1e-3,
     batch_size: int = 32,
     epochs: int = 200,
+    noise: float = 0.001,
     debug: bool = False,
     checkpoint_path: Optional[str] = None,
     logger: Optional[Logger] = None,
     callbacks: Optional[list] = None,
 ) -> LitModel:
-    criterion = FLDLoss(forecast=forecast, alpha=alpha)
+    criterion = RWMLoss(forecast=forecast)
 
-    train_dataset = FLDDataset(
+    train_dataset = ContextDataset(
         data_path=train_path,
         context=context,
         forecast=forecast,
+        noise_level=noise,
     )
-    val_dataset = FLDDataset(
+    val_dataset = ContextDataset(
         data_path=val_path,
         context=context,
         forecast=forecast,
     )
 
+    config = train_dataset.config
+
     observable_dim = train_dataset.get_observable_dim()
 
-    model = FLD(
-        observable_dim=observable_dim,
-        hidden_dim=hidden_dim,
-        latent_dim=embedding_dim,
-        segment_length=context,
+    print(
+        f"Encoder: {encoder_class} \nDynamics: {dynamics_class} \nDecoder: {decoder_class}"
+    )
+
+    model = ContextModel(
+        encoder=encoder_class(
+            observable_dim=observable_dim,
+            latent_dim=embedding_dim,
+            hidden_dim=hidden_dim,
+            context=context,
+            config=config,
+        ),
+        dynamics=dynamics_class(
+            latent_dim=embedding_dim,
+            hidden_dim=hidden_dim,
+            context=context,
+            config=config,
+        ),
+        decoder=decoder_class(
+            observable_dim=observable_dim,
+            latent_dim=embedding_dim,
+            hidden_dim=hidden_dim,
+            context=context,
+            config=config,
+        ),
         forecast=forecast,
     )
 
@@ -106,7 +128,6 @@ def train(
         devices="auto",
         deterministic=True,
         fast_dev_run=debug,
-        overfit_batches=10 if debug else 0,
     )
 
     # Create data loaders
@@ -137,18 +158,28 @@ def main(args: argparse.Namespace) -> None:
     logger = get_logger(args)
     callbacks = get_callbacks(args) if not args.debug else []
 
+    encoder_class = encoder_dict[args.encoder]
+    dynamics_class = dynamics_dict[args.dynamics]
+    decoder_class = decoder_dict[args.decoder]
+
+    if any(c is None for c in [encoder_class, dynamics_class, decoder_class]):
+        raise ValueError("Invalid model component specified.")
+
     model = train(
         train_path=args.train_path,
         val_path=args.val_path,
+        encoder_class=encoder_class,
+        dynamics_class=dynamics_class,
+        decoder_class=decoder_class,
         hidden_dim=args.hidden_dim,
         embedding_dim=args.embedding_dim,
         context=args.context,
         forecast=args.forecast,
-        alpha=args.alpha,
         weight_decay=args.weight_decay,
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,
         epochs=args.epochs,
+        noise=args.noise,
         debug=args.debug,
         checkpoint_path=args.checkpoint,
         logger=logger,
@@ -180,8 +211,6 @@ def main(args: argparse.Namespace) -> None:
     # Continuity test
     test_continuity(rollout, continuity_dataset.initial_velocities)
 
-    visualise_latent_space(rollout, continuity_dataset.initial_velocities)
-
     # Finalize logging
     if logger and isinstance(logger, WandbLogger):
         wandb.finish()
@@ -189,8 +218,8 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     args = parse_args()
-    args.run_name = "fld"
-    args.training = "fld"
+    create_run_name(args)
+    args.training = "rwm"
     try:
         main(args)
     except Exception as e:

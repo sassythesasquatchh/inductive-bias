@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--train_path", type=str, default="data/normal_training_1000.pkl"
     )
-    parser.add_argument("--val_path", type=str, default="data/validation.pkl")
+    parser.add_argument("--val_path", type=str, default="data/validation_100.pkl")
     parser.add_argument(
         "--visualisation_data_path",
         type=str,
@@ -66,14 +66,14 @@ def parse_args() -> argparse.Namespace:
         "--continuity_data_path", type=str, default="data/continuity_test.pkl"
     )
 
-    parser.add_argument("--batch_size", type=int, default=1)
+    parser.add_argument("--batch_size", type=int, default=32)
     parser.add_argument("--early_stopping", action="store_true")
     parser.add_argument("--model_path", type=str, default=None)
 
     # Model config
     # parser.add_argument("--model", type=str, default="unstructured")
     parser.add_argument("--observable_dim", type=int, default=12)
-    parser.add_argument("--hidden_dim", type=int, default=64)
+    parser.add_argument("--hidden_dim", type=int, default=32)
     parser.add_argument("--embedding_dim", type=int, default=3)
     parser.add_argument("--segment_length", type=int, default=51)
     parser.add_argument("--encoder", type=str)
@@ -86,7 +86,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--l", type=float, default=config.L)
 
     # Training config
-    parser.add_argument("--noise", type=float, default=0.0)
+    parser.add_argument("--noise", type=float, default=0.001)
 
     # Optimization config
     parser.add_argument("--epochs", type=int, default=200)
@@ -96,6 +96,14 @@ def parse_args() -> argparse.Namespace:
     # RWM config
     parser.add_argument("--context", type=int, default=32)
     parser.add_argument("--forecast", type=int, default=8)
+    parser.add_argument("--alpha", type=float, default=0.9)
+
+    # Loss config
+    parser.add_argument("--supervise_rollout", action="store_true")
+    parser.add_argument("--supervise_end_to_end", action="store_true")
+    parser.add_argument("--penalise_latent_magnitude", action="store_true")
+    parser.add_argument("--penalise_latent_mismatch", action="store_true")
+    parser.add_argument("--penalise_latent_dynamics", action="store_true")
 
     args = parser.parse_args()
 

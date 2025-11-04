@@ -1,0 +1,37 @@
+# Configure Runs
+# Bash file expects the structure:
+# train_path val_path visualisation_path continuity_path forecast alpha tag epochs
+
+# Open
+
+# Normal 
+data/normal_training_1000.pkl data/validation_100.pkl data/visualisation.pkl data/continuity_test.pkl 8 0.95 normal_open 250
+
+# Normal (Few)
+data/normal_training_40.pkl data/validation_100.pkl data/visualisation.pkl data/continuity_test.pkl 8 0.95 normal_few_open 500
+
+# Sparse
+data/sparse_training_1000.pkl data/validation_100.pkl data/visualisation.pkl data/continuity_test.pkl 8 0.95 sparse_open 300
+
+# Normal (No forecast)
+data/normal_training_1000.pkl data/validation_100.pkl data/visualisation.pkl data/continuity_test.pkl 2 0.95 normal_open_small_forecast 250
+
+# Normal (Long forecast)
+data/normal_training_1000.pkl data/validation_100.pkl data/visualisation.pkl data/continuity_test.pkl 33 0.95 normal_open_long_forecast 250
+
+# Closed
+
+# Normal 
+data/normal_training_1000_closed.pkl data/validation_100_closed.pkl data/visualisation_closed.pkl data/continuity_test_closed.pkl 8 0.95 normal_closed 200
+
+# Normal (Few)
+data/normal_training_20_closed.pkl data/validation_100_closed.pkl data/visualisation_closed.pkl data/continuity_test_closed.pkl 8 0.95 normal_few_closed 500
+
+# Sparse
+data/sparse_training_1000_closed.pkl data/validation_100_closed.pkl data/visualisation_closed.pkl data/continuity_test_closed.pkl 8 0.95 sparse_closed 300
+
+# Normal (No forecast)
+data/normal_training_1000_closed.pkl data/validation_100_closed.pkl data/visualisation_closed.pkl data/continuity_test_closed.pkl 2 0.95 normal_closed_small_forecast 250
+
+# Normal (Long forecast)
+data/normal_training_1000_closed.pkl data/validation_100_closed.pkl data/visualisation_closed.pkl data/continuity_test_closed.pkl 33 0.95 normal_closed_long_forecast 250

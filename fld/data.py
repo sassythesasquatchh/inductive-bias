@@ -11,13 +11,18 @@ from util.config import Config
 class FLDDataset(Dataset):
     config: Config
 
-    def __init__(self, data_path: Path, context=51, forecast=8):
+    def __init__(self, data_path: Path, context=51, forecast=8, noise_level=0.01):
         data = pickle.load(open(data_path, "rb"))
         self.data = data["trajectories"]
         self.config = Config(**data["simulation_config"])
         self.context = context
         self.forecast = forecast
+        self.noise_level = noise_level
         self.trajectory_length = self.data[0]["observed"].shape[0]
+        self.std_dev = torch.std(
+            torch.tensor(self.data[0]["observed"], dtype=torch.float32),
+            dim=0,
+        )
 
     def __len__(self):
         return len(self.data)
@@ -41,6 +46,10 @@ class FLDDataset(Dataset):
                 ],
                 dtype=torch.float32,
             )
+
+        if self.noise_level > 0:
+            noise = torch.randn_like(X_t) * self.noise_level * self.std_dev
+            X_t = X_t + noise
 
         return X_t, X_tk
 

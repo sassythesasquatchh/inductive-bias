@@ -5,11 +5,11 @@ from typing import Optional
 import ipdb
 import pytorch_lightning as pl
 import torch
-import wandb
 from dotenv import load_dotenv
 from pytorch_lightning.loggers import Logger, WandbLogger
 from torch.utils.data import DataLoader
 
+import wandb
 from context_models.decoders import BaseDecoder
 from context_models.dynamics import BaseDynamics
 from context_models.encoders import BaseEncoder
@@ -49,6 +49,7 @@ def train(
     learning_rate: float = 1e-3,
     batch_size: int = 32,
     epochs: int = 200,
+    noise: float = 0.001,
     debug: bool = False,
     checkpoint_path: Optional[str] = None,
     logger: Optional[Logger] = None,
@@ -60,6 +61,7 @@ def train(
         data_path=train_path,
         context=context,
         forecast=forecast,
+        noise_level=noise,
     )
     val_dataset = ContextDataset(
         data_path=val_path,
@@ -164,20 +166,20 @@ def main(args: argparse.Namespace) -> None:
         raise ValueError("Invalid model component specified.")
 
     model = train(
+        train_path=args.train_path,
+        val_path=args.val_path,
         encoder_class=encoder_class,
         dynamics_class=dynamics_class,
         decoder_class=decoder_class,
-        observable_dim=args.observable_dim,
         hidden_dim=args.hidden_dim,
         embedding_dim=args.embedding_dim,
         context=args.context,
         forecast=args.forecast,
-        train_path=args.train_path,
-        val_path=args.val_path,
         weight_decay=args.weight_decay,
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,
         epochs=args.epochs,
+        noise=args.noise,
         debug=args.debug,
         checkpoint_path=args.checkpoint,
         logger=logger,

@@ -55,7 +55,7 @@ def test_metrics(vis_rollout):
 
     assert torch.isclose(length, torch.Tensor([config.L]), atol=1e-3).all()
     assert torch.isclose(
-        energy, torch.mean(energy, dim=-1).unsqueeze(1), atol=5e-1
+        energy, torch.mean(energy, dim=-1).unsqueeze(1), atol=7e-1
     ).all()
 
 

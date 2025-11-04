@@ -9,3 +9,5 @@ __pycache__/
 /artifacts
 /dev
 /lightning_logs
+/media
+/results

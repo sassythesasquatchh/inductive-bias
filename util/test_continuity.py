@@ -1,9 +1,9 @@
 import numpy as np
 import torch
-import wandb
 from dotenv import load_dotenv
 from jaxtyping import Float
 
+import wandb
 from common.classes import RolloutOutput
 from util.wandb_util import to_wandb
 
@@ -27,7 +27,7 @@ def test_continuity(
     # Pairwise distances for all points between consecutive trajectories
     # B-1 x N x N
     distances = torch.norm(
-        latent_trajectories[1:, :, np.newaxis, :]
+        latent_trajectories[1:, np.newaxis, :, :]
         - latent_trajectories[:-1, :, np.newaxis, :],
         dim=-1,
     )
@@ -60,7 +60,7 @@ def test_continuity(
             initial_velocities[1:].detach().cpu().numpy().tolist(),
             d_traj.detach().cpu().numpy().tolist(),
         ),
-        columns=["Trajectory Index", "Difference Quotient"],
+        columns=["initial-velocity", "difference-quotient"],
     )
 
     l2_deriv_table = wandb.Table(
@@ -68,7 +68,7 @@ def test_continuity(
             initial_velocities[1:].detach().cpu().numpy().tolist(),
             l2_differences.detach().cpu().numpy().tolist(),
         ),
-        columns=["Trajectory Index", "L2 Distance"],
+        columns=["initial-velocity", "l2-distance"],
     )
 
     norm_table = wandb.Table(
@@ -76,7 +76,7 @@ def test_continuity(
             initial_velocities.detach().cpu().numpy().tolist(),
             l2_norms.detach().cpu().numpy().tolist(),
         ),
-        columns=["Trajectory Index", "Norm"],
+        columns=["initial-velocity", "norm"],
     )
 
     try:
@@ -84,8 +84,8 @@ def test_continuity(
             {
                 "derivative": wandb.plot.line(
                     deriv_table,
-                    "Trajectory Index",
-                    "Difference Quotient",
+                    "initial-velocity",
+                    "difference-quotient",
                     title="Continuity - Custom Metric",
                 )
             }
@@ -95,8 +95,8 @@ def test_continuity(
             {
                 "l2_distance": wandb.plot.line(
                     l2_deriv_table,
-                    "Trajectory Index",
-                    "L2 Distance",
+                    "initial-velocity",
+                    "l2-distance",
                     title="Continuity - L2 Metric",
                 )
             }
@@ -105,7 +105,7 @@ def test_continuity(
         wandb.log(
             {
                 "norm": wandb.plot.line(
-                    norm_table, "Trajectory Index", "Norm", title="Norm"
+                    norm_table, "initial-velocity", "norm", title="Norm"
                 )
             }
         )

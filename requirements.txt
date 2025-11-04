@@ -9,3 +9,5 @@ pytorch-lightning
 jaxtyping
 equinox
 optax
+plotly
+scikit-learn

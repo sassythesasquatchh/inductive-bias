@@ -5,8 +5,9 @@ class Config(BaseModel):
     GRAVITY: float = 9.81
     L: float = 1.0
     M: float = 1.0
-    TIMESPAN: float = 8.0
-    NUM_SAMPLES: int = 120
+    DAMPING: float = 0.0
+    TIMESPAN: float = 6.0
+    NUM_SAMPLES: int = 90
     SAMPLING_POSITIONS: list[float] = [1.0, 0.8, 0.6, 0.4]
 
     @computed_field

@@ -4,8 +4,13 @@ import jax.numpy as jnp
 import optax
 from jax import vmap
 from jaxtyping import Float
+from pytorch_lightning.loggers.wandb import WandbLogger
 
+import wandb
 from util.dataset import JaxTrajectoryDataset
+from util.jax import to_torch
+from util.train import get_logger
+from util.visualisation import visualise_latent_space
 
 from .data import PendulumDataset
 from .model import PendulumHNN
@@ -126,6 +131,8 @@ def main(args):
     from util.test_continuity import test_continuity
     from util.visualisation import animate_trajectories
 
+    logger = get_logger(args) if not args.debug else None
+
     model = train(
         training_data_path=args.train_path,
         validation_data_path=args.val_path,
@@ -133,6 +140,8 @@ def main(args):
         batch_size=args.batch_size,
         sequence_length=args.segment_length,
         lr=args.learning_rate,
+        use_canonical_encoder=args.encoder == "informed",
+        use_canonical_decoder=args.decoder == "informed",
     )
 
     visualisation_dataset = JaxTrajectoryDataset(
@@ -143,8 +152,10 @@ def main(args):
         data_path=args.continuity_data_path, type="observed"
     )
 
-    visualisation_rollout = model.rollout(visualisation_dataset.data).to_torch()
-    continuity_rollout = model.rollout(continuity_dataset.data).to_torch()
+    visualisation_rollout = model.rollout(visualisation_dataset.data)
+    visualisation_rollout = {k: to_torch(v) for k, v in visualisation_rollout.items()}
+    continuity_rollout = model.rollout(continuity_dataset.data)
+    continuity_rollout = {k: to_torch(v) for k, v in continuity_rollout.items()}
     evaluate_rollout(visualisation_rollout, visualisation_dataset)
     animate_trajectories(
         visualisation_rollout,
@@ -152,13 +163,23 @@ def main(args):
         visualisation_dataset.traj_names,
         args.run_name,
     )
+    visualise_latent_space(continuity_rollout, continuity_dataset.initial_velocities)
 
     test_continuity(continuity_rollout, continuity_dataset.initial_velocities)
 
+    if logger and isinstance(logger, WandbLogger):
+        wandb.finish()
+
 
 if __name__ == "__main__":
+    import ipdb
+
     from util.pre_util import parse_args
 
     args = parse_args()
-    args.run_name = f"{args.model}_{args.segment_length}"
-    main(args)
+    args.run_name = f"hnn_{args.encoder}_{args.decoder}"
+    try:
+        main(args)
+    except Exception as e:
+        print(e)
+        ipdb.post_mortem()

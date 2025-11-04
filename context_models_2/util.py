@@ -19,14 +19,28 @@ class MLP(nn.Module):
         return self.model(x)
 
 
+# class RWMLoss(nn.Module):
+#     def __init__(self, alpha=0.9, forecast=8):
+#         super(RWMLoss, self).__init__()
+#         self.alpha = alpha
+#         self.register_buffer(
+#             "weights", torch.tensor([alpha**k for k in range(forecast)])
+#         )
+
+#     def forward(self, pred, target):
+#         # return torch.mean((pred - target) ** 2 * self.weights.view(1, -1, 1))
+#         return torch.mean((pred - target) ** 2)
+
+
 class RWMLoss(nn.Module):
-    def __init__(self, alpha=0.9, forecast=8):
+    def __init__(self, forecast=8, alpha=0.9):
         super(RWMLoss, self).__init__()
+        self.forecast = forecast
         self.alpha = alpha
         self.register_buffer(
             "weights", torch.tensor([alpha**k for k in range(forecast)])
         )
 
     def forward(self, pred, target):
-        # return torch.mean((pred - target) ** 2 * self.weights.view(1, -1, 1))
-        return torch.mean((pred - target) ** 2)
+        # Pred and target have dimension (batch_size, forecast_length, segment_length, observable_dim)
+        return torch.mean((pred - target) ** 2 * self.weights.view(1, -1, 1, 1))

@@ -5,43 +5,56 @@ import numpy as np
 
 from util.config import Config
 
-config = Config()
 
-
-def pendulum_ode(t, y):
+def pendulum_ode(t, y, config: Config):
     theta, theta_dot = y
-    dydt = [theta_dot, -(config.GRAVITY / config.L) * np.sin(theta)]
+    dydt = [
+        theta_dot,
+        -(config.GRAVITY / config.L) * np.sin(theta) - config.DAMPING * theta_dot,
+    ]
     return dydt
 
 
-def velocity_verlet(pendulum_ode, y0, t_eval):
+def velocity_verlet(pendulum_ode, y0, t_eval, config: Config):
+    def pendulum_ode(t, y):
+        theta, theta_dot = y
+        dydt = [
+            theta_dot,
+            -(config.GRAVITY / config.L) * np.sin(theta) - config.DAMPING * theta_dot,
+        ]
+        return dydt
+
     dt = t_eval[1] - t_eval[0]
     y = np.zeros((len(y0), len(t_eval)))
     y[:, 0] = y0
 
     theta, theta_dot = y0
     for i in range(1, len(t_eval)):
-        # Update position (theta) using current velocity
-        theta += theta_dot * dt
+        # Compute acceleration at current position
+        _, theta_ddot = pendulum_ode(t_eval[i - 1], [theta, theta_dot])
 
-        # Compute acceleration at the new position
-        _, theta_ddot = pendulum_ode(t_eval[i], [theta, theta_dot])
+        # Update position
+        theta_new = theta + theta_dot * dt + 0.5 * theta_ddot * dt**2
 
-        # Update velocity using the new acceleration
-        theta_dot += theta_ddot * dt
+        # Compute new acceleration
+        _, theta_ddot_new = pendulum_ode(t_eval[i], [theta_new, theta_dot])
 
-        # Store the updated state
+        # Update velocity
+        theta_dot_new = theta_dot + 0.5 * (theta_ddot + theta_ddot_new) * dt
+
+        theta, theta_dot = theta_new, theta_dot_new
         y[:, i] = [theta, theta_dot]
 
     return y, t_eval
 
 
-def simulate_trajectory(initial_conditions, t_eval):
-    y, t = velocity_verlet(pendulum_ode, initial_conditions, t_eval)
+def simulate_trajectory(initial_conditions, t_eval, config: Config):
+    y, t = velocity_verlet(pendulum_ode, initial_conditions, t_eval, config)
     return y, t
 
 
 def get_ranges(option: str, num_trajectories: int, only_small: bool = False):
+    validation_set_delta = 0.01
     if not only_small:
         if option == "normal_training":
             range_1 = np.linspace(0.5, 3, int(num_trajectories * 2.5 / 9.5))
@@ -49,6 +62,23 @@ def get_ranges(option: str, num_trajectories: int, only_small: bool = False):
             range_3 = np.linspace(9, 12, int(num_trajectories * 3 / 9.5))
             theta_dot0_vals = np.concatenate((range_1, range_2, range_3))
         elif option == "validation":
+            range_1 = np.linspace(
+                0.5 + validation_set_delta,
+                3 + validation_set_delta,
+                int(num_trajectories * 2.5 / 9.5),
+            )
+            range_2 = np.linspace(
+                4 + validation_set_delta,
+                8 + validation_set_delta,
+                int(num_trajectories * 4 / 9.5),
+            )
+            range_3 = np.linspace(
+                9 + validation_set_delta,
+                12 + validation_set_delta,
+                int(num_trajectories * 3 / 9.5),
+            )
+            theta_dot0_vals = np.concatenate((range_1, range_2, range_3))
+        elif option == "test":
             range_1 = np.linspace(3, 3.4, num_trajectories // 4)
             range_2 = np.linspace(3.6, 4, num_trajectories // 4)
             range_3 = np.linspace(8, 8.4, num_trajectories // 4)
@@ -68,6 +98,12 @@ def get_ranges(option: str, num_trajectories: int, only_small: bool = False):
         if option == "normal_training":
             theta_dot0_vals = np.linspace(0.5, 3, num_trajectories)
         elif option == "validation":
+            theta_dot0_vals = np.linspace(
+                0.5 + validation_set_delta,
+                3 + validation_set_delta,
+                num_trajectories,
+            )
+        elif option == "test":
             theta_dot0_vals = np.linspace(3, 4, num_trajectories)
         elif option == "visualisation":
             theta_dot0_vals = np.array([2, 3.5])
@@ -94,9 +130,18 @@ def get_trajectory_names(args):
     return None
 
 
-def generate_trajectories(
-    args, t_eval=np.linspace(0, config.TIMESPAN, config.NUM_SAMPLES)
-):
+def generate_trajectories(args):
+    config = Config()
+    config.DAMPING = args.damping
+    multiplication_factor = (
+        2 if args.option in ["continuity_test", "visualisation"] else 1
+    )
+
+    t_eval = np.linspace(
+        0,
+        multiplication_factor * config.TIMESPAN,
+        multiplication_factor * config.NUM_SAMPLES,
+    )
     trajectories = []
     initial_conditions_list = []
 
@@ -109,7 +154,7 @@ def generate_trajectories(
     sampling_positions = config.L * np.array(config.SAMPLING_POSITIONS)
 
     for i, (theta0, theta_dot0) in enumerate(initial_conditions_list):
-        y, t = simulate_trajectory([theta0, theta_dot0], t_eval)
+        y, t = simulate_trajectory([theta0, theta_dot0], t_eval, config)
 
         theta = y[0]
         theta_dot = y[1]
@@ -139,8 +184,10 @@ def generate_trajectories(
     filename = f"{args.option}"
     if ("training" in args.option) or ("validation" in args.option):
         filename += f"_{args.num_trajectories}"
-        if args.noise > 0:
-            filename += f"_{args.noise}"
+    if args.only_small:
+        filename += "_closed"
+    if config.DAMPING > 0:
+        filename += f"_damping_{config.DAMPING}"
 
     result = {
         "trajectories": trajectories,
@@ -169,6 +216,7 @@ if __name__ == "__main__":
         choices=[
             "normal_training",
             "validation",
+            "test",
             "visualisation",
             "sparse_training",
             "continuity_test",
@@ -193,6 +241,10 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--only-small", action="store_true", help="Generate only small trajectories."
+    )
+
+    parser.add_argument(
+        "--damping", type=float, default=0.0, help="Damping coefficient."
     )
 
     args = parser.parse_args()

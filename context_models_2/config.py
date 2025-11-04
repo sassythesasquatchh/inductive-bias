@@ -1,4 +1,4 @@
-from context_models import decoders, dynamics, encoders
+from context_models_2 import decoders, dynamics, encoders
 
 encoder_dict = {
     "unstructured": encoders.UnstructuredEncoder,

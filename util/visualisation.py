@@ -4,8 +4,10 @@ import matplotlib
 import matplotlib.animation as animation
 import matplotlib.pyplot as plt
 import numpy as np
-import wandb
+import torch
+from sklearn.decomposition import PCA
 
+import wandb
 from common.classes import RolloutOutput
 from util.config import Config
 
@@ -220,25 +222,69 @@ def animate_trajectory(
     return fname
 
 
+def pca_to_3d(rollout: RolloutOutput) -> RolloutOutput:
+    B, C, D = rollout["latent_gt"].shape
+    x_np = (
+        torch.cat(
+            [
+                rollout["latent_gt"],
+                rollout["latent_end_to_end"],
+                rollout["latent_rollout"],
+            ],
+            dim=0,
+        )
+        .cpu()
+        .numpy()
+    )
+    x_np = x_np.reshape(3 * B * C, D)
+
+    pca = PCA(n_components=3)
+    x_pca = pca.fit_transform(x_np)
+    x_pca = x_pca.reshape(3 * B, C, 3)
+
+    rollout["latent_gt"] = torch.tensor(
+        x_pca[0:B, :, :],
+        device=rollout["latent_gt"].device,
+        dtype=rollout["latent_gt"].dtype,
+    )
+    rollout["latent_end_to_end"] = torch.tensor(
+        x_pca[B : 2 * B, :, :],
+        device=rollout["latent_end_to_end"].device,
+        dtype=rollout["latent_end_to_end"].dtype,
+    )
+    rollout["latent_rollout"] = torch.tensor(
+        x_pca[2 * B : 3 * B, :, :],
+        device=rollout["latent_rollout"].device,
+        dtype=rollout["latent_rollout"].dtype,
+    )
+    return rollout
+
+
 def animate_trajectories(
     rollout: RolloutOutput, config: Config, names: list[str], folder_name: str
 ):
     """
     Names: List of trajectory names.
     """
+
+    latent_dim = rollout["latent_gt"].shape[2]
+    if latent_dim > 3:
+        rollout = pca_to_3d(rollout)
+
     for i, name in zip(range(len(rollout["obs_gt"])), names):
         trajectory = rollout["obs_gt"][i].detach().cpu().numpy().T
         reconstructed_trajectory = rollout["obs_end_to_end"][i].detach().cpu().numpy().T
+
         latent_trajectory = rollout["latent_gt"][i].detach().cpu().numpy().T
         latent_reconstructed_trajectory = (
             rollout["latent_end_to_end"][i].detach().cpu().numpy().T
         )
 
-        if latent_trajectory.shape[0] > 3:
+        if latent_trajectory is not None and latent_trajectory.shape[0] > 3:
             print(f"Skipping {name} latent animation as latent dim > 3")
             latent_trajectory = None
             latent_reconstructed_trajectory = None
-        if latent_trajectory.shape[0] == 2:
+        if latent_trajectory is not None and latent_trajectory.shape[0] == 2:
             latent_trajectory = np.vstack(
                 (latent_trajectory, np.zeros(latent_trajectory.shape[1]))
             )
@@ -261,7 +307,13 @@ def animate_trajectories(
         )
 
         try:
-            wandb.log({video_name: wandb.Video(filename, caption=video_name)})
+            wandb.log(
+                {
+                    video_name: wandb.Video(
+                        filename, caption=video_name, format=filename.split(".")[-1]
+                    )
+                }
+            )
         except Exception as e:
             print(f"Failed to log video to wandb: {e}")
 
@@ -275,11 +327,11 @@ def animate_trajectories(
             rollout["latent_rollout"][i].detach().cpu().numpy().T
         )
 
-        if latent_trajectory.shape[0] > 3:
+        if latent_trajectory is not None and latent_trajectory.shape[0] > 3:
             print(f"Skipping {name} latent animation as latent dim > 3")
             latent_trajectory = None
             latent_reconstructed_trajectory = None
-        if latent_trajectory.shape[0] == 2:
+        if latent_trajectory is not None and latent_trajectory.shape[0] == 2:
             latent_trajectory = np.vstack(
                 (latent_trajectory, np.zeros(latent_trajectory.shape[1]))
             )
@@ -311,3 +363,245 @@ def animate_trajectories(
             )
         except Exception as e:
             print(f"Failed to log video to wandb: {e}")
+
+
+def visualise_latent_space(rollout: RolloutOutput, initial_velocities: torch.Tensor):
+    from plotly import graph_objects as go
+    # Visualise continuity of embedding
+
+    embedding_latent_trajectories = rollout["latent_gt"]
+    rollout_latent_trajectories = rollout["latent_rollout"]
+
+    latent_dim = embedding_latent_trajectories.shape[2]
+
+    def pad_to_3d(tensor: torch.Tensor) -> torch.Tensor:
+        if tensor.shape[2] == 2:
+            return torch.cat(
+                [
+                    tensor,
+                    torch.zeros(
+                        tensor.shape[0],
+                        tensor.shape[1],
+                        1,
+                        device=tensor.device,
+                        dtype=tensor.dtype,
+                    ),
+                ],
+                dim=2,
+            )
+        return tensor
+
+    if latent_dim == 2:
+        # Pad to 3D for visualisation
+        embedding_latent_trajectories = pad_to_3d(embedding_latent_trajectories)
+
+        rollout_latent_trajectories = pad_to_3d(rollout_latent_trajectories)
+
+    elif latent_dim > 3:
+        # Use PCA to reduce to 3D for visualisation
+        rollout = pca_to_3d(rollout)
+        embedding_latent_trajectories = rollout["latent_gt"]
+        rollout_latent_trajectories = rollout["latent_rollout"]
+
+    STEP = 3
+    embedding_latent_trajectories_plot = (
+        embedding_latent_trajectories.detach().cpu().numpy()
+    )
+    embedding_latent_trajectories_plot = embedding_latent_trajectories_plot[::STEP]
+    initial_velocities = initial_velocities[::STEP]
+
+    fig = go.Figure()
+    for i in range(len(embedding_latent_trajectories_plot)):
+        traj = embedding_latent_trajectories_plot[i]
+        fig.add_trace(
+            go.Scatter3d(
+                x=traj[:, 0],
+                y=traj[:, 1],
+                z=traj[:, 2],
+                mode="lines",
+                line=dict(
+                    width=2,
+                    color=np.full(traj.shape[0], initial_velocities[i].item()),
+                    colorscale="bluered",
+                    cmin=min(initial_velocities).item(),
+                    cmax=max(initial_velocities).item(),
+                ),
+            )
+        )
+
+    fig.update_layout(showlegend=False)
+
+    # fig.show()
+
+    try:
+        wandb.log({"embedding_continuity": fig})
+    except Exception as e:
+        print(f"Error logging embedding continuity to wandb: {e}")
+
+    # Latent space phase portrait
+
+    rollout_latent_trajectories_plot = (
+        rollout_latent_trajectories.detach().cpu().numpy()
+    )
+    rollout_latent_trajectories_plot = rollout_latent_trajectories_plot[::STEP]
+
+    fig = go.Figure()
+    Xs, Ys, Zs = [], [], []
+    Us, Vs, Ws = [], [], []
+
+    step = 12  # sampling stride along each trajectory
+    target_scale = 0.05  # scale factor relative to scene size
+
+    for traj in rollout_latent_trajectories_plot:
+        x, y, z = traj[:, 0], traj[:, 1], traj[:, 2]
+        u, v, w = np.gradient(x), np.gradient(y), np.gradient(z)
+
+        # normalize directions
+        mag = np.sqrt(u**2 + v**2 + w**2)
+        norm = np.where(mag == 0, 1, mag)
+        u, v, w = u / norm, v / norm, w / norm
+
+        # trajectory line
+        fig.add_trace(
+            go.Scatter3d(
+                x=x,
+                y=y,
+                z=z,
+                mode="lines",
+                line=dict(width=2, color="blue"),
+                showlegend=False,
+            )
+        )
+
+        # sample along the curve
+        idx = slice(0, len(x), step)
+        Xs.extend(x[idx])
+        Ys.extend(y[idx])
+        Zs.extend(z[idx])
+        Us.extend(u[idx])
+        Vs.extend(v[idx])
+        Ws.extend(w[idx])
+
+    # compute scene scale for cone size
+    all_points = np.vstack([Xs, Ys, Zs])
+    scene_range = np.ptp(all_points, axis=1).max()  # overall plot scale
+    target_len = target_scale * scene_range
+
+    cone_trace = go.Cone(
+        x=np.array(Xs),
+        y=np.array(Ys),
+        z=np.array(Zs),
+        u=np.array(Us),
+        v=np.array(Vs),
+        w=np.array(Ws),
+        sizemode="absolute",
+        sizeref=target_len,
+        anchor="tail",
+        colorscale="bluered",
+        showscale=False,
+        visible=True,  # default: visible
+    )
+
+    fig.add_trace(cone_trace)
+
+    # add toggle button for cones
+    fig.update_layout(
+        updatemenus=[
+            dict(
+                type="buttons",
+                showactive=True,
+                buttons=[
+                    dict(
+                        label="Show Arrows",
+                        method="update",
+                        args=[
+                            {
+                                "visible": [True]
+                                * (len(rollout_latent_trajectories_plot) + 1)
+                            }
+                        ],
+                    ),
+                    dict(
+                        label="Hide Arrows",
+                        method="update",
+                        args=[
+                            {
+                                "visible": [True]
+                                * len(rollout_latent_trajectories_plot)
+                                + [False]
+                            }
+                        ],
+                    ),
+                ],
+                x=0.02,
+                y=1.05,
+                xanchor="left",
+                yanchor="top",
+            )
+        ],
+        showlegend=False,
+        # title="Latent Space Phase Portrait",
+    )
+
+    # fig.show()
+
+    try:
+        wandb.log({"latent_phase_portrait": fig})
+    except Exception as e:
+        print(f"Error logging latent phase portrait to wandb: {e}")
+
+    # Combined plot
+
+    fig = go.Figure()
+    for i in range(len(embedding_latent_trajectories_plot)):
+        embedding_traj = embedding_latent_trajectories_plot[i]
+        fig.add_trace(
+            go.Scatter3d(
+                x=embedding_traj[:, 0],
+                y=embedding_traj[:, 1],
+                z=embedding_traj[:, 2],
+                mode="lines",
+                line=dict(width=2, color="gray"),
+                name="Embedding" if i == 0 else None,
+                showlegend=(i == 0),
+            )
+        )
+        rollout_traj = rollout_latent_trajectories_plot[i]
+        fig.add_trace(
+            go.Scatter3d(
+                x=rollout_traj[:, 0],
+                y=rollout_traj[:, 1],
+                z=rollout_traj[:, 2],
+                mode="lines",
+                line=dict(width=2, color="red"),
+                name="Phase Portrait" if i == 0 else None,
+                showlegend=(i == 0),
+            )
+        )
+
+    # fig.show()
+    try:
+        wandb.log({"structure_overlay": fig})
+    except Exception as e:
+        print(f"Error logging structure overlay to wandb: {e}")
+
+    # Log latent alignment
+    distances = torch.norm(
+        rollout_latent_trajectories.reshape(1, -1, 3)
+        - embedding_latent_trajectories.reshape(-1, 1, 3),
+        dim=-1,
+    )
+
+    chamfer_distance = torch.mean(torch.min(distances, dim=1).values) + torch.mean(
+        torch.min(distances, dim=0).values
+    )
+
+    norm = torch.mean(
+        torch.norm(rollout_latent_trajectories.reshape(-1, 3), dim=-1)
+    ) + torch.mean(torch.norm(embedding_latent_trajectories.reshape(-1, 3), dim=-1))
+    chamfer_distance = chamfer_distance / norm
+
+    try:
+        wandb.log({"latent_alignment": chamfer_distance.item()})
+    except Exception as e:
+        print(f"Error logging latent alignment to wandb: {e}")
