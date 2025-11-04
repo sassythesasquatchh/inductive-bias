@@ -21,7 +21,7 @@ class BaseEncoder(nn.Module):
 
     def forward(
         self, x: Float[torch.Tensor, "batch context observable_dim"]
-    ) -> Float[torch.Tensor, "batch context latent_dim"]:
+    ) -> Float[torch.Tensor, "batch latent_dim"]:
         """
         Given a sequence in the observable space, return the corresponding sequence in the latent space
         """
@@ -44,8 +44,8 @@ class IdentityEncoder(BaseEncoder):
 
     def forward(
         self, x: Float[torch.Tensor, "batch context observable_dim"]
-    ) -> Float[torch.Tensor, "batch context latent_dim"]:
-        return x
+    ) -> Float[torch.Tensor, "batch latent_dim"]:
+        return x[:, -1, :]
 
     def get_latent_dim(self) -> int:
         return self.latent_dim
@@ -54,19 +54,15 @@ class IdentityEncoder(BaseEncoder):
 class UnstructuredEncoder(BaseEncoder):
     def __init__(self, observable_dim, hidden_dim, latent_dim, **kwargs):
         super().__init__(**kwargs)
-        self.net = MLP(
-            observable_dim * self.context, hidden_dim, latent_dim * self.context
-        )
+        self.net = MLP(observable_dim * self.context, hidden_dim, latent_dim)
         self.latent_dim = latent_dim
 
     def forward(
         self, x: Float[torch.Tensor, "batch context observable_dim"]
-    ) -> Float[torch.Tensor, "batch context latent_dim"]:
-        assert x.size(1) == self.context, (
-            f"Input sequence length {x.size(1)} does not match model context length {self.context}"
-        )
+    ) -> Float[torch.Tensor, "batch latent_dim"]:
+        B, C, D = x.size()
 
-        return self.net(x.reshape(x.size(0), -1)).reshape(x.size(0), x.size(1), -1)
+        return self.net(x.reshape(B, C * D))
 
     def get_latent_dim(self) -> int:
         return self.latent_dim
@@ -82,25 +78,25 @@ class InformedEncoder(BaseEncoder):
 
     def forward(
         self, x: Float[torch.Tensor, "batch context observable_dim"]
-    ) -> Float[torch.Tensor, "batch context 3"]:
+    ) -> Float[torch.Tensor, "batch 3"]:
         """
         Extracts the x position, y position and angular velocity at the furthest point along the pendulum
         """
         x = x + 0 * self.dummy_param  # Ensure that model output requires grad
-        X = x[:, :, self.furthest_point_index]
-        Y = x[:, :, self.furthest_point_index + self.config.NUM_POINTS]
+        X = x[:, -1, self.furthest_point_index].unsqueeze(-1)
+        Y = x[:, -1, self.furthest_point_index + self.config.NUM_POINTS].unsqueeze(-1)
         ang_vel = (
-            x[:, :, self.furthest_point_index + 2 * self.config.NUM_POINTS]
+            x[:, -1, self.furthest_point_index + 2 * self.config.NUM_POINTS]
             / self.config.L
-        )
-        return torch.stack([X, Y, ang_vel], dim=2)
+        ).unsqueeze(-1)
+        return torch.cat([X, Y, ang_vel], dim=-1)
 
     def get_latent_dim(self) -> int:
         return 3
 
 
 class CNNEncoder(BaseEncoder):
-    def __init__(self, observable_dim, hidden_dim, latent_channels=2, **kwargs):
+    def __init__(self, observable_dim, hidden_dim, latent_dim=2, **kwargs):
         super().__init__(**kwargs)
         self.conv_args = {
             "kernel_size": self.context,
@@ -114,27 +110,30 @@ class CNNEncoder(BaseEncoder):
             nn.Conv1d(observable_dim, hidden_dim, **self.conv_args),
             nn.BatchNorm1d(hidden_dim),
             nn.ELU(),
-            nn.Conv1d(hidden_dim, latent_channels, **self.conv_args),
-            nn.BatchNorm1d(latent_channels),
+            nn.Conv1d(hidden_dim, latent_dim, **self.conv_args),
+            nn.BatchNorm1d(latent_dim),
             nn.ELU(),
         )
-        self.angle_encoder = nn.Linear(self.context, 2 * self.context)
-        self.angular_velocity_encoder = nn.Linear(self.context, 1 * self.context)
+        self.latent_dim = latent_dim
+        self.reducers = nn.ModuleList(
+            [nn.Linear(self.context, 1) for _ in range(latent_dim)]
+        )
 
     def forward(
         self, x: Float[torch.Tensor, "batch context observable_dim"]
-    ) -> Float[torch.Tensor, "batch context 3"]:
+    ) -> Float[torch.Tensor, "batch latent_dim"]:
         assert x.size(1) == self.context, (
             f"Input sequence length {x.size(1)} does not match model context length {self.context}"
         )
         z = self.encoder(x.permute(0, 2, 1))
-        # Interpret the first channel as angular position
-        angle = self.angle_encoder(z[:, 0, :]).view(x.size(0), self.context, 2)
-        # Interpret the second channel as angular velocity
-        angular_velocity = self.angular_velocity_encoder(z[:, 1, :]).view(
-            x.size(0), self.context, 1
-        )
-        return torch.cat((angle, angular_velocity), dim=2)
+
+        B, D, C = z.size()
+
+        reduced_channels = []
+        for i in range(D):
+            reduced_channel = self.reducers[i](z[:, i, :])
+            reduced_channels.append(reduced_channel)
+        return torch.cat(reduced_channels, dim=-1)
 
     def get_latent_dim(self) -> int:
-        return 3
+        return self.latent_dim

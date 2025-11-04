@@ -14,7 +14,7 @@ from context_models.decoders import BaseDecoder
 from context_models.dynamics import BaseDynamics
 from context_models.encoders import BaseEncoder
 from context_models.model import ContextModel
-from context_models.util import RWMLoss
+from context_models.util import CombinedLoss, LossConfig, RWMLoss
 from util.dataset import TorchTrajectoryDataset
 from util.pre_util import parse_args
 from util.rollout import evaluate_rollout
@@ -26,7 +26,7 @@ from util.train import (
     get_logger,
     load_args_from_checkpoint,
 )
-from util.visualisation import animate_trajectories
+from util.visualisation import animate_trajectories, visualise_latent_space
 
 from .config import decoder_dict, dynamics_dict, encoder_dict
 from .data import ContextDataset
@@ -45,6 +45,14 @@ def train(
     embedding_dim: int = 2,
     context: int = 33,
     forecast: int = 8,
+    alpha: float = 0.9,
+    loss_config: LossConfig = LossConfig(
+        supervise_rollout=False,
+        supervise_end_to_end=True,
+        penalise_latent_magnitude=False,
+        penalise_latent_mismatch=False,
+        penalise_latent_dynamics=False,
+    ),
     weight_decay: float = 1e-4,
     learning_rate: float = 1e-3,
     batch_size: int = 32,
@@ -55,7 +63,8 @@ def train(
     logger: Optional[Logger] = None,
     callbacks: Optional[list] = None,
 ) -> LitModel:
-    criterion = RWMLoss(forecast=forecast)
+    rwm_loss = RWMLoss(forecast=forecast, alpha=alpha)
+    criterion = CombinedLoss(config=loss_config, rwm_loss=rwm_loss)
 
     train_dataset = ContextDataset(
         data_path=train_path,
@@ -165,6 +174,14 @@ def main(args: argparse.Namespace) -> None:
     if any(c is None for c in [encoder_class, dynamics_class, decoder_class]):
         raise ValueError("Invalid model component specified.")
 
+    loss_config = LossConfig(
+        supervise_rollout=args.supervise_rollout,
+        supervise_end_to_end=args.supervise_end_to_end,
+        penalise_latent_magnitude=args.penalise_latent_magnitude,
+        penalise_latent_mismatch=args.penalise_latent_mismatch,
+        penalise_latent_dynamics=args.penalise_latent_dynamics,
+    )
+
     model = train(
         train_path=args.train_path,
         val_path=args.val_path,
@@ -176,6 +193,8 @@ def main(args: argparse.Namespace) -> None:
         context=args.context,
         forecast=args.forecast,
         weight_decay=args.weight_decay,
+        loss_config=loss_config,
+        alpha=args.alpha,
         learning_rate=args.learning_rate,
         batch_size=args.batch_size,
         epochs=args.epochs,
@@ -194,6 +213,14 @@ def main(args: argparse.Namespace) -> None:
         data_path=args.continuity_data_path, type="observed"
     )
     model.eval()
+
+    with torch.no_grad():
+        rollout = model.model.rollout(continuity_dataset.data.to(model.device))
+
+    visualise_latent_space(rollout, continuity_dataset.initial_velocities)
+    # Continuity test
+    test_continuity(rollout, continuity_dataset.initial_velocities)
+
     with torch.no_grad():
         rollout = model.model.rollout(visualisation_dataset.data.to(model.device))
 
@@ -204,12 +231,6 @@ def main(args: argparse.Namespace) -> None:
         visualisation_dataset.traj_names,
         args.run_name,
     )
-
-    with torch.no_grad():
-        rollout = model.model.rollout(continuity_dataset.data.to(model.device))
-
-    # Continuity test
-    test_continuity(rollout, continuity_dataset.initial_velocities)
 
     # Finalize logging
     if logger and isinstance(logger, WandbLogger):

@@ -11,11 +11,11 @@ dynamics_dict = {
     "informed": dynamics.InformedDynamics,
     "unstructured": dynamics.UnstructuredDynamics,
     "hybrid": dynamics.HybridDynamics,
+    "hybrid_alt": dynamics.HybridDynamics2,
 }
 
 decoder_dict = {
     "unstructured": decoders.UnstructuredDecoder,
     "informed": decoders.InformedDecoder,
-    "cnn": decoders.CNNDecoder,
     "identity": decoders.IdentityDecoder,
 }

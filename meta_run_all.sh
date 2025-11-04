@@ -1,7 +1,7 @@
 
 
 CONFIG_FILE="meta_config.txt"
-TAG_SUFFIX="03-11-25"
+TAG_SUFFIX=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in

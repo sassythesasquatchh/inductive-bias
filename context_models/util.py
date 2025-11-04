@@ -1,5 +1,9 @@
+from typing import TypedDict
+
 import torch
 from torch import nn
+
+from common.classes import ForwardOutput
 
 
 class MLP(nn.Module):
@@ -30,3 +34,35 @@ class RWMLoss(nn.Module):
     def forward(self, pred, target):
         # return torch.mean((pred - target) ** 2 * self.weights.view(1, -1, 1))
         return torch.mean((pred - target) ** 2)
+
+
+class LossConfig(TypedDict):
+    supervise_rollout: bool
+    supervise_end_to_end: bool
+    penalise_latent_magnitude: bool
+    penalise_latent_mismatch: bool
+    penalise_latent_dynamics: bool
+
+
+class CombinedLoss(nn.Module):
+    def __init__(self, config: LossConfig, rwm_loss: RWMLoss = RWMLoss()):
+        super(CombinedLoss, self).__init__()
+        self.rwm_loss = rwm_loss
+        self.config = config
+
+    def forward(self, x: ForwardOutput, gt_traj: torch.Tensor):
+        loss = torch.tensor(0.0, device=gt_traj.device)
+        if self.config["supervise_rollout"]:
+            loss += self.rwm_loss(x["obs_rollout"], gt_traj)
+        if self.config["supervise_end_to_end"]:
+            loss += self.rwm_loss(x["obs_end_to_end"], gt_traj)
+        if self.config["penalise_latent_magnitude"]:
+            loss += torch.mean(x["latent_end_to_end"] ** 2)
+            loss += torch.mean(x["latent_rollout"] ** 2)
+        if self.config["penalise_latent_mismatch"]:
+            loss += torch.mean((x["latent_end_to_end"] - x["latent_rollout"]) ** 2)
+        if self.config["penalise_latent_dynamics"]:
+            loss += torch.mean(
+                (x["latent_rollout"][:, 1:, :] - x["latent_rollout"][:, :-1, :]) ** 2
+            )
+        return loss

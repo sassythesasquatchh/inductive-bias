@@ -12,7 +12,7 @@ VALIDATION_FILE="data/validation_100.pkl"
 VISUALISATION_FILE="data/visualisation.pkl"
 CONTINUITY_FILE="data/continuity_test.pkl"
 
-python3 -m context_models_3.train \
+python3 -m context_models.train \
     --encoder "$encoder" \
     --decoder "$decoder" \
     --dynamics "$dynamics" \
@@ -29,7 +29,7 @@ python3 -m context_models_3.train \
     --run_name "supervise_rollout" \
     --supervise_rollout
 
-python3 -m context_models_3.train \
+python3 -m context_models.train \
     --encoder "$encoder" \
     --decoder "$decoder" \
     --dynamics "$dynamics" \
@@ -46,7 +46,7 @@ python3 -m context_models_3.train \
     --run_name "supervise_end_to_end" \
     --supervise_end_to_end
 
-python3 -m context_models_3.train \
+python3 -m context_models.train \
     --encoder "$encoder" \
     --decoder "$decoder" \
     --dynamics "$dynamics" \
@@ -64,7 +64,7 @@ python3 -m context_models_3.train \
     --supervise_end_to_end \
     --supervise_rollout
 
-python3 -m context_models_3.train \
+python3 -m context_models.train \
     --encoder "$encoder" \
     --decoder "$decoder" \
     --dynamics "$dynamics" \
@@ -84,7 +84,7 @@ python3 -m context_models_3.train \
     --penalise_latent_mismatch 
 
 
-python3 -m context_models_3.train \
+python3 -m context_models.train \
     --encoder "$encoder" \
     --decoder "$decoder" \
     --dynamics "$dynamics" \

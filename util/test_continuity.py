@@ -13,15 +13,6 @@ load_dotenv()
 def test_continuity(
     rollout: RolloutOutput, initial_velocities: Float[torch.Tensor, "batch"]
 ):
-    # model.eval()
-    # if hasattr(model, "model"):
-    #     inference_model = model.model
-    # else:
-    #     inference_model = model
-
-    # with torch.no_grad():
-    #     rollout = inference_model.rollout(dataset.data)
-
     latent_trajectories = rollout["latent_gt"]
 
     # Pairwise distances for all points between consecutive trajectories

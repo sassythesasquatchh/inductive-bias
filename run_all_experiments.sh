@@ -96,7 +96,7 @@ while read -r encoder dynamics decoder context latent_dim; do
     [[ -z "$encoder" || "$encoder" =~ ^# ]] && continue
 
     echo "Running experiment with encoder: $encoder, dynamics: $dynamics, decoder: $decoder, context: $context, latent_dim: $latent_dim"
-    python3 -m context_models_3.train \
+    python3 -m context_models.train \
         --encoder "$encoder" \
         --decoder "$decoder" \
         --dynamics "$dynamics" \
@@ -115,7 +115,7 @@ while read -r encoder dynamics decoder context latent_dim; do
         --penalise_latent_mismatch
 done < "$CONFIG_FILE"
 
-# HNN models
+# # HNN models
 # for encoder in informed unstructured; do
 #     for decoder in informed unstructured; do
 #         echo "Running HNN experiment with encoder: $encoder, decoder: $decoder"
